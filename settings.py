@@ -1,6 +1,10 @@
 import os
 import json
 
+CHECK_HOUR = 9
+CHECK_MIN = 00
+CHECK_ALREADY = False
+
 BOT_TOKEN = os.getenv('SCIST_TOKEN')
 
 DB_NAME = os.getenv('SCIST_DB_NAME')

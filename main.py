@@ -1,12 +1,13 @@
 import os
 import json
+import asyncio
 import discord
 import pymongo
 from settings import *
 from seed import seeder
 from logger import logger
-from datetime import datetime
-from discord.ext import commands
+from discord.ext import commands, tasks
+from datetime import datetime, timedelta
 
 bot = commands.Bot(command_prefix='!')
 client = pymongo.MongoClient("mongodb://{}:{}@{}:{}".format(
@@ -17,6 +18,7 @@ client = pymongo.MongoClient("mongodb://{}:{}@{}:{}".format(
 ))
 db = client[DB_NAME]
 s_col = db['school']
+u_col = db['no_role_user']
 
 async def scistLog(message):
     logger.info(message)
@@ -35,7 +37,9 @@ async def on_ready():
     seeder()
 
     guild = bot.get_guild(id=GUILD_ID)
-    members = guild.fetch_members(limit=None)
+    members = await guild.fetch_members(limit=None).flatten()
+ 
+    CheckRole.start()
     
     await scistLog('Logger in as {}'.format(bot.user.name))
 
@@ -92,6 +96,61 @@ async def cschool(ctx):
             await scistLog('{} remove self role {}'.format(member.name, role.name))
     
     await ctx.send('成功移除身分組!\n\n請記得在五天內重新選擇身分組否則會被移出 SCIST server 喔!')
+
+@tasks.loop(hours=4)
+async def CheckRole():
+    global members
+
+    no_role_user = list()
+    
+    for member in members:
+        have_school = False
+        
+        for role in member.roles:
+            if s_col.count_documents({'idx': role.id}):
+                have_school = True
+
+                continue
+
+        if not have_school and not member.bot:
+            no_role_user.append(member) 
+    
+    for member in no_role_user:
+        if member.name == '你想喵喵喵嗎?':
+            user = u_col.find_one({'idx': member.id})
+            times = 0 if not user else user['times']
+
+            if not times:
+                u_col.insert_one({'idx': member.id, 'times': 1})
+            elif times < 5:
+                u_col.update_one({'idx': member.id}, {'$inc': {'times': 1}})
+            else:
+                u_col.delete_one({'idx': member.id})
+                
+                await scistLog('{} has been kicked cause not choose role in 5 days'.format(member.name))
+                await member.send('你因為超過五天沒登記身分組\n\n' 
+                                    '所以被移出 server 且無法再使用 scist bot 所提供的功能了\n\n' \
+                                    '如想要重新進入伺服器請聯繫 SCIST 粉專謝謝!') 
+                await guild.kick(member)
+
+                continue
+
+            await scistLog('{} has already not choose for {} days'.format(member.name, times+1))
+            await member.send('你已經 {} 天沒有登記身分組了\n\n在 {} 天就會被移出 server\n\n請盡快登記!'.format(times, 5-times))
+    
+    members = await guild.fetch_members(limit=None).flatten()
+
+@CheckRole.before_loop
+async def BeforeCheckRole():
+    await bot.wait_until_ready()
+
+    now = datetime.now()
+    fut = now.replace(year=now.year, month=now.month, day=now.day, hour=CHECK_HOUR, minute=CHECK_MIN, second=0)
+    
+    if now.hour >= fut.hour and now.minute > fut.minute:
+        fut = fut + timedelta(days=1)
+
+    await asyncio.sleep((fut-now).total_seconds())
 
 if __name__ == '__main__':
     bot.run(BOT_TOKEN)
