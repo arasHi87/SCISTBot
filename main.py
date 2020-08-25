@@ -61,8 +61,13 @@ async def school(ctx, msg: str):
     have_school = False
 
     if not s_col.count_documents({'e_name': school}):
+        msg = '請重新確認你的學校簡寫是否正確!\n\n以下是所有學校對應表：\n'
+
+        for s in s_col.find({}):
+            msg += '{}: {}\n'.format(s['c_name'], s['e_name'])
+
         await scistLog('{} try to add role with wrong school name'.format(member.name))
-        await ctx.send('請重新確認你的學校簡寫是否正確!')
+        await ctx.send(msg)
     else:
         for role in roles:
             if not have_school and s_col.count_documents({'idx': role.id}):
