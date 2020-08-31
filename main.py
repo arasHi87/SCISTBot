@@ -39,7 +39,7 @@ async def on_ready():
     guild = bot.get_guild(id=GUILD_ID)
     members = guild.fetch_members(limit=None)
     
-    await scistLog('Logger in as {}'.format(bot.user.name))
+    await scistLog('Logged in as {}'.format(bot.user.name))
 
 @bot.event
 async def on_member_join(member: discord.Member):
