@@ -114,7 +114,7 @@ async def CheckRole():
                 continue
 
         if not have_school and not member.bot:
-            no_role_user.append(member.name) 
+            no_role_user.append(member) 
         
     for member in no_role_user:
         if not u_col.count_documents({'idx': member.id}):
